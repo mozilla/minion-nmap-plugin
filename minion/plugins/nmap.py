@@ -149,7 +149,7 @@ class NMAPPlugin(ExternalProcessPlugin):
             self.report_artifacts("NMAP Output", ["nmap.stdout.txt", "nmap.stderr.txt"])
             services = parse_nmap_output(self.nmap_stdout)
             issues = services_to_issues(services)
-            self.callbacks.report_issues(issues)
-            self.callbacks.report_finish()
+            self.report_issues(issues)
+            self.report_finish()
         else:
             self.report_finish("FAILED")
