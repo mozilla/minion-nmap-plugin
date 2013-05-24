@@ -8,7 +8,7 @@ install_requires = [
     'minion-backend'
 ]
 
-setup(name="minion.nmap_plugin",
+setup(name="minion-nmap-plugin",
       version="0.2",
       description="NMAP Plugin for Minion",
       url="https://github.com/mozilla/minion-nmap-plugin/",
