@@ -5,11 +5,11 @@
 from setuptools import setup
 
 install_requires = [
-    'minion.plugin_service'
+    'minion-backend'
 ]
 
-setup(name="minion.nmap_plugin",
-      version="0.1",
+setup(name="minion-nmap-plugin",
+      version="0.2",
       description="NMAP Plugin for Minion",
       url="https://github.com/mozilla/minion-nmap-plugin/",
       author="Mozilla",

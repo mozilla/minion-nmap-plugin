@@ -5,7 +5,8 @@
 
 import re
 import urlparse
-from minion.plugin_api import ExternalProcessPlugin
+from minion.plugins.base import ExternalProcessPlugin
+
 
 NOTABLE_ISSUES = [
     {
@@ -108,7 +109,7 @@ def services_to_issues(services):
 class NMAPPlugin(ExternalProcessPlugin):
 
     PLUGIN_NAME = "NMAP"
-    PLUGIN_VERSION = "0.1"
+    PLUGIN_VERSION = "0.2"
 
     NMAP_NAME = "nmap"
 
@@ -153,3 +154,4 @@ class NMAPPlugin(ExternalProcessPlugin):
             self.report_finish()
         else:
             self.report_finish("FAILED")
+
