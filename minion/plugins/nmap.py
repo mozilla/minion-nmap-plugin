@@ -110,6 +110,7 @@ class NMAPPlugin(ExternalProcessPlugin):
 
     PLUGIN_NAME = "NMAP"
     PLUGIN_VERSION = "0.2"
+    PLUGIN_WEIGHT = "light"
 
     NMAP_NAME = "nmap"
 
