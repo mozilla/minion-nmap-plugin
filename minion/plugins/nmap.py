@@ -4,107 +4,94 @@
 
 
 import re
-import urlparse
+import os
+import collections
+import netaddr
 from minion.plugins.base import ExternalProcessPlugin
 
-
-NOTABLE_ISSUES = [
-    {
-        "_ports": [22],
-        "Severity": "Low",
-        "Summary": "Public SSH service found"
-    },
-    {
-        "_ports": [53],
-        "Severity": "Low",
-        "Summary": "Public DNS service found"
-    },
-    {
-        "_ports": [80,443],
-        "Severity": "Informational",
-        "Summary": "Standard HTTP services were found"
-    },
-    {
-        "_ports": [3306],
-        "Ports": [],
+def _create_port_open_issue(ip, port):
+    issue = {
         "Severity": "High",
-        "Summary": "Public MySQL database found",
-        "Description": "A publicly accessible instance of the MySQL database was found on port 3306.",
-        "Solution": "Configure MySQL to listen only on localhost. If other servers need to access to this database then use firewall rules to only allow those servers to connect."
-    },
-    {
-        "_ports": [5432],
-        "Severity": "High",
-        "Summary": "Public PostgreSQL database found",
-        "Description": "A publicly accessible instance of the PostgreSQL database was found on port 5432.",
-        "Solution": "Configure PostgreSQL to listen only on localhost. If other servers need to access this database then use firewall rules to only allow those servers to connect."
-    },
-    {
-        "_ports": [25,113,143,465,587,993,995],
-        "Severity": "Medium",
-        "Summary": "Email service(s) found",
-        "Solution": "It is not recomended to run email services on the same server on which a web site is hosted. It is generally a good idea to separate services to different servers to minimize the attack surface."
+        "Summary": ip + " - Port " + str(port) + " open",
+        "Description": "A open port was found whereas it was not in the whitelist of open ports",
+        "Ports": [port]
     }
-]
+    return issue
 
-def find_notable_issue(port):
-    for issue in NOTABLE_ISSUES:
-        if port in issue['_ports']:
-            return issue
+
+def _create_wordy_version_issue(ip, service):
+    issue = {
+        "Severity": "High",
+        "Summary": ip + " - Wordy version found on port " + str(service['port']),
+        "Description": "A wordy version : " + service['version'] + " was found on the service : " + service['service'],
+        "Ports": [service['port']],
+    }
+    return issue
+
+
+def _create_bad_filtration_firewall_issue(ip):
+    issue = {
+        "Severity": "Medium",
+        "Summary": ip + " - Probably misconfigured firewall",
+        "Description": "The scan showed that both closed and filtered ports are present whereas they should be filtered",
+    }
+    return issue
+
+def _create_missing_filtration_firewall_issue(ip):
+    issue = {
+        "Severity": "Medium",
+        "Summary": ip + " - Probably missing rules in firewall or no firewall at all",
+        "Description": "The scan showed that only closed ports are present whereas they should be filtered",
+    }
+    return issue
+
+def find_open_ports(ip_address, ip_addresses):
+    for address in ip_addresses:
+        if ip_address in address["address"]:
+            return address["ports"]
+    return []
+
 
 def parse_nmap_output(output):
-    services = []
+    ips = collections.OrderedDict()
     for line in output.split("\n"):
-        match = re.match('^(\d+)/(tcp|udp)\s+open\s+(\w+)', line)
-        if match is not None:
-            services.append({'port':int(match.group(1)),'protocol':match.group(2), 'service':match.group(3)})
-    return services
+
+        match_ip = re.match('^Nmap\sscan\sreport\sfor\s(([0-9.]+)|\S+\s\(([0-9.]+)\))', line)
+        if match_ip is not None:
+            if match_ip.group(2) is not None:
+                current_ip = match_ip.group(2)
+            else:
+                current_ip = match_ip.group(3)
+            ips[current_ip] = []
+
+        match_service = re.match('^(\d+)/(tcp|udp)\s+(open|closed|filtered)\s+(\S+)\s*(.*)', line)
+        if match_service is not None:
+            ips[current_ip].append({'port': int(match_service.group(1)), 'protocol': match_service.group(2),
+                                    'state': match_service.group(3), 'service': match_service.group(4),
+                                    'version': match_service.group(5)})
+
+        match_not_show = re.match('^Not\sshown:\s\d+\s(closed|filtered)\sports', line)
+        if match_not_show is not None:
+            ips[current_ip].append({'not_shown': match_not_show.group(1)})
+
+    return ips
+
 
 def find_port_in_issues(port, issues):
     for issue in issues:
         if port in issue['Ports']:
             return True
 
-def find_earlier_found_issue(port, issues):
-    for issue in issues:
-        if port in issue['_ports']:
-            return issue
 
-def services_to_issues(services):
+def _validate_ports(ports):
+    # U:53,111,137,T:21-25,139,8080
+    return re.match(r"(((U|T):)\d+(-\d+)?)(,((U|T):)?\d+(-\d+)?)*", ports)
 
-    unique_ports = set()
-    for service in services:
-        unique_ports.add(service['port'])
-    
-    high_risk_ports = set()
 
-    issues = []
+def _validate_open_ports(open_ports):
+    # 80,21-25,8080
+    return re.match(r"(\d+(-\d+)?)(,(\d+)(-\d+)?)*", open_ports)
 
-    for port in unique_ports:
-        # If we have not seen this port before
-        if port not in high_risk_ports and not find_port_in_issues(port, issues):
-            issue = find_earlier_found_issue(port, issues)
-            if issue:
-                issue.setdefault("Ports", []).append(port)                
-            else:
-                issue = find_notable_issue(port)
-                if issue:
-                    # If we have a detailed issue then we use that
-                    issues.append(issue)
-                    issue.setdefault("Ports", []).append(port)
-                else:
-                    # Otherwise all unknown services go to high risk.
-                    high_risk_ports.add(port)
-
-    if len(high_risk_ports) > 0:
-        issues.append({"Ports": list(high_risk_ports), "Severity": "High",
-                       "Summary": "Unknown public services found."})
-        
-    for issue in issues:
-        if '_ports' in issue:
-            del issue['_ports']
-
-    return issues
 
 class NMAPPlugin(ExternalProcessPlugin):
 
@@ -114,27 +101,84 @@ class NMAPPlugin(ExternalProcessPlugin):
 
     NMAP_NAME = "nmap"
 
-    def _validate_ports(self, ports):
-        # U:53,111,137,T:21-25,139,8080
-        return re.match(r"(((U|T):)\d+(-\d+)?)(,((U|T):)?\d+(-\d+)?)*", ports)
+    def _load_whitelist(self, conf_path):
+
+        if not os.path.isfile(conf_path):
+            raise Exception("The given path doesn't lead to a file")
+
+        try:
+            with open(conf_path) as f:
+                whitelist = f.readlines()
+            return whitelist
+        except Exception as e:
+            raise Exception("Can't open the file for the given path")
+
+    def ips_to_issues(self, ips):
+
+        issues = []
+
+        for ip in ips:
+            addresses = []
+            closed_ports = False
+            filtered_ports = False
+            if "addresses" in self.configuration:
+                addresses = self.configuration["addresses"]
+            open_ports = find_open_ports(ip, addresses)
+
+            for service in ips[ip]:
+                if 'not_shown' in service:
+                    closed_ports = service["not_shown"] == "closed"
+                    filtered_ports = service["not_shown"] == "filtered"
+
+                else:
+                    if service['state'] == 'open' and service['port'] not in open_ports:
+                        issues.append(_create_port_open_issue(ip, service['port']))
+
+                    if service['state'] == 'closed':
+                        closed_ports = True
+
+                    if service['state'] == 'filtered':
+                        filtered_ports = True
+
+                    if service['version'] and service['version'] not in self.version_whitelist:
+                        issues.append(_create_wordy_version_issue(ip, service))
+
+            if closed_ports and filtered_ports:
+                issues.append(_create_bad_filtration_firewall_issue(ip))
+            elif closed_ports:
+                issues.append(_create_missing_filtration_firewall_issue(ip))
+
+        return issues
 
     def do_start(self):
         nmap_path = self.locate_program(self.NMAP_NAME)
         if nmap_path is None:
             raise Exception("Cannot find nmap in path")
+
         self.nmap_stdout = ""
         self.nmap_stderr = ""
-        u = urlparse.urlparse(self.configuration['target'])
-        args = ["--open"]
+
+        self.version_whitelist = []
+        if 'version_whitelist' in self.configuration:
+            self.version_whitelist = self.configuration['version_whitelist'].split(',')
+
+        try:
+            target = netaddr.IPNetwork(self.configuration['target'])
+        except:
+            raise Exception("Input target is not an IP address or a network of IP addresses")
+        args = ["-sV"]
         ports = self.configuration.get('ports')
         if ports:
-            if not self._validate_ports(ports):
+            if not _validate_ports(ports):
                 raise Exception("Invalid ports specification")
             args += ["-p", ports]
-        args += [u.hostname]
+
+        args += [str(target)]
+
         self.spawn(nmap_path, args)
 
     def do_process_stdout(self, data):
+        self.report_progress(11, data)
         self.nmap_stdout += data
 
     def do_process_stderr(self, data):
@@ -144,15 +188,10 @@ class NMAPPlugin(ExternalProcessPlugin):
         if self.stopping and status == 9:
             self.report_finish("STOPPED")
         elif status == 0:
-            with open("nmap.stdout.txt", "w") as f:
-                f.write(self.nmap_stdout)
-            with open("nmap.stderr.txt", "w") as f:
-                f.write(self.nmap_stderr)
-            self.report_artifacts("NMAP Output", ["nmap.stdout.txt", "nmap.stderr.txt"])
-            services = parse_nmap_output(self.nmap_stdout)
-            issues = services_to_issues(services)
+            ips = parse_nmap_output(self.nmap_stdout)
+            issues = self.ips_to_issues(ips)
+
             self.report_issues(issues)
             self.report_finish()
         else:
             self.report_finish("FAILED")
-

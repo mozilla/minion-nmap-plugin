@@ -5,15 +5,16 @@
 from setuptools import setup
 
 install_requires = [
+    'netaddr==0.7.11',
     'minion-backend'
 ]
 
 setup(name="minion-nmap-plugin",
       version="0.2",
       description="NMAP Plugin for Minion",
-      url="https://github.com/mozilla/minion-nmap-plugin/",
-      author="Mozilla",
-      author_email="minion@mozilla.com",
+      url="https://github.com/Wawki/minion-nmap-plugin/",
+      author="Frederic Guegan",
+      author_email="guegan.frederic@gmail.com",
       packages=['minion', 'minion.plugins'],
       namespace_packages=['minion', 'minion.plugins'],
       include_package_data=True,
