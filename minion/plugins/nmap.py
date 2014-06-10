@@ -22,26 +22,30 @@ def _create_port_open_issue(ip, port):
 def _create_wordy_version_issue(ip, service):
     issue = {
         "Severity": "High",
-        "Summary": ip + " - Wordy version found on port " + str(service['port']),
+        "Summary": ip + " - Wordy version ( " + service['version'] + ") found on port " + str(service['port']),
         "Description": "A wordy version : " + service['version'] + " was found on the service : " + service['service'],
-        "Ports": [service['port']],
+        "Ports": [service['port']]
     }
     return issue
 
 
-def _create_bad_filtration_firewall_issue(ip):
+def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports):
     issue = {
         "Severity": "Medium",
         "Summary": ip + " - Probably misconfigured firewall",
-        "Description": "The scan showed that both closed and filtered ports are present whereas they should be filtered",
+        "Description": "The scan showed that both closed and filtered ports are present whereas they should be filtered"
+                       "\n\n"
+                       "Evidence --- Closed port(s) : " + closed_ports + " - Filtered port(s) : " + filtered_ports
     }
     return issue
 
-def _create_missing_filtration_firewall_issue(ip):
+def _create_missing_filtration_firewall_issue(ip, closed_ports):
     issue = {
         "Severity": "Medium",
         "Summary": ip + " - Probably missing rules in firewall or no firewall at all",
-        "Description": "The scan showed that only closed ports are present whereas they should be filtered",
+        "Description": "The scan showed that only closed ports are present whereas they should be filtered"
+                       "\n\n"
+                       "Evidence --- Closed port(s) : " + closed_ports
     }
     return issue
 
@@ -119,34 +123,50 @@ class NMAPPlugin(ExternalProcessPlugin):
 
         for ip in ips:
             addresses = []
-            closed_ports = False
-            filtered_ports = False
+            closed_ports = ""
+            filtered_ports = ""
             if "addresses" in self.configuration:
                 addresses = self.configuration["addresses"]
             open_ports = find_open_ports(ip, addresses)
 
             for service in ips[ip]:
                 if 'not_shown' in service:
-                    closed_ports = service["not_shown"] == "closed"
-                    filtered_ports = service["not_shown"] == "filtered"
+                    if service["not_shown"] == "closed":
+                        if not closed_ports:
+                            closed_ports += "\"Not shown closed ports\""
+                        else:
+                            closed_ports += ", \"Not shown closed ports\""
+
+
+                    if service["not_shown"] == "filtered":
+                        if not filtered_ports:
+                            filtered_ports += "\"Not shown filtered ports\""
+                        else:
+                            filtered_ports += ", \"Not shown filtered ports\""
 
                 else:
                     if service['state'] == 'open' and service['port'] not in open_ports:
                         issues.append(_create_port_open_issue(ip, service['port']))
 
                     if service['state'] == 'closed':
-                        closed_ports = True
+                        if not closed_ports:
+                            closed_ports += str(service['port'])
+                        else:
+                            closed_ports += ", " + str(service['port'])
 
                     if service['state'] == 'filtered':
-                        filtered_ports = True
+                        if not filtered_ports:
+                            filtered_ports += str(service['port'])
+                        else:
+                            filtered_ports += ", " + str(service['port'])
 
                     if service['version'] and service['version'] not in self.version_whitelist:
                         issues.append(_create_wordy_version_issue(ip, service))
 
             if closed_ports and filtered_ports:
-                issues.append(_create_bad_filtration_firewall_issue(ip))
+                issues.append(_create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports))
             elif closed_ports:
-                issues.append(_create_missing_filtration_firewall_issue(ip))
+                issues.append(_create_missing_filtration_firewall_issue(ip, closed_ports))
 
         return issues
 
@@ -178,7 +198,6 @@ class NMAPPlugin(ExternalProcessPlugin):
         self.spawn(nmap_path, args)
 
     def do_process_stdout(self, data):
-        self.report_progress(11, data)
         self.nmap_stdout += data
 
     def do_process_stderr(self, data):
