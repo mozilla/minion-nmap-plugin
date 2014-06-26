@@ -15,7 +15,8 @@ def _create_port_open_issue(ip, port):
         "Severity": "High",
         "Summary": ip + " - Port " + str(port) + " open",
         "Description": "A open port was found whereas it was not in the whitelist of open ports",
-        "Ports": [port]
+        "Ports": [port],
+        "URLs": [{"URL": ip}]
     }
     return issue
 
@@ -25,7 +26,8 @@ def _create_wordy_version_issue(ip, service):
         "Severity": "High",
         "Summary": ip + " - Wordy version ( " + service['version'] + ") found on port " + str(service['port']),
         "Description": "A wordy version : " + service['version'] + " was found on the service : " + service['service'],
-        "Ports": [service['port']]
+        "Ports": [service['port']],
+         "URLs": [{"URL": ip}]
     }
     return issue
 
@@ -36,7 +38,8 @@ def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports):
         "Summary": ip + " - Probably misconfigured firewall",
         "Description": "The scan showed that both closed and filtered ports are present whereas they should be filtered"
                        "\n\n"
-                       "Evidence --- Closed port(s) : " + closed_ports + " - Filtered port(s) : " + filtered_ports
+                       "Evidence --- Closed port(s) : " + closed_ports + " - Filtered port(s) : " + filtered_ports,
+        "URLs": [{"URL": ip}]
     }
     return issue
 
@@ -46,7 +49,8 @@ def _create_missing_filtration_firewall_issue(ip, closed_ports):
         "Summary": ip + " - Probably missing rules in firewall or no firewall at all",
         "Description": "The scan showed that only closed ports are present whereas they should be filtered"
                        "\n\n"
-                       "Evidence --- Closed port(s) : " + closed_ports
+                       "Evidence --- Closed port(s) : " + closed_ports,
+        "URLs": [{"URL": ip}]
     }
     return issue
 
