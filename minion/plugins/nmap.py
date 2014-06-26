@@ -7,6 +7,7 @@ import re
 import os
 import collections
 import netaddr
+from urlparse import urlparse
 from minion.plugins.base import ExternalProcessPlugin
 
 def _create_port_open_issue(ip, port):
@@ -180,13 +181,18 @@ class NMAPPlugin(ExternalProcessPlugin):
 
         self.version_whitelist = []
         if 'version_whitelist' in self.configuration:
-            self.version_whitelist = self.configuration['version_whitelist'].split(',')
+            self.version_whitelist = self.configuration['version_whitelist']
 
         try:
             target = netaddr.IPNetwork(self.configuration['target'])
         except:
-            raise Exception("Input target is not an IP address or a network of IP addresses")
-        args = ["-sV"]
+            try:
+                url = urlparse(self.configuration['target'])
+                target = url.hostname
+            except:
+                raise Exception("Input target is not an IP address or a network of IP addresses or a valid URL")
+
+        args = ["-sV", "-Pn"]
         ports = self.configuration.get('ports')
         if ports:
             if not _validate_ports(ports):
