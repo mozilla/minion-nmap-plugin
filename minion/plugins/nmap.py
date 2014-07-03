@@ -10,24 +10,46 @@ import netaddr
 from urlparse import urlparse
 from minion.plugins.base import ExternalProcessPlugin
 
-def _create_port_open_issue(ip, port):
+def _create_unauthorized_open_port_issue(ip, port, protocol):
     issue = {
-        "Severity": "High",
-        "Summary": ip + " - Port " + str(port) + " open",
-        "Description": "A open port was found whereas it was not in the whitelist of open ports",
-        "Ports": [port],
-        "URLs": [{"URL": ip}]
+        'Severity': 'High',
+        'Summary': ip + ': ' + str(port) + '/' + str(protocol) + ' open (unauthorized)',
+        'Description': 'Unauthorized open port for this host',
+        'URLs': [{'URL': ip}],
+        'Ports': [port],
+        'Classification': {
+            'cwe_id': '200',
+            'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
+        }
     }
     return issue
 
 
+def _create_authorized_open_port_issue(ip, port, protocol):
+    issue = {
+        'Severity': 'Info',
+        'Summary': ip + ': ' + str(port) + '/' + str(protocol) + ' open (authorized)',
+        'Description': 'Authorized open port for this host',
+        'URLs': [{'URL': ip}],
+        'Ports': [port],
+        'Classification': {
+            'cwe_id': '200',
+            'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
+        }
+    }
+    return issue
+
 def _create_wordy_version_issue(ip, service):
     issue = {
-        "Severity": "High",
-        "Summary": ip + " - Wordy version ( " + service['version'] + ") found on port " + str(service['port']),
-        "Description": "A wordy version : " + service['version'] + " was found on the service : " + service['service'],
-        "Ports": [service['port']],
-         "URLs": [{"URL": ip}]
+        'Severity': 'Low',
+        'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + ' open: "' + service['version'] + '" (information disclosure)',
+        'Description': 'Information disclosure',
+        'URLs': [{'URL': ip}],
+        'Ports': [service['port']],
+        'Classification': {
+            'cwe_id': '200',
+            'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
+        }
     }
     return issue
 
@@ -39,9 +61,14 @@ def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports):
         "Description": "The scan showed that both closed and filtered ports are present whereas they should be filtered"
                        "\n\n"
                        "Evidence --- Closed port(s) : " + closed_ports + " - Filtered port(s) : " + filtered_ports,
-        "URLs": [{"URL": ip}]
+        "URLs": [{"URL": ip}],
+        'Classification': {
+            'cwe_id': '200',
+            'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
+        }
     }
     return issue
+
 
 def _create_missing_filtration_firewall_issue(ip, closed_ports):
     issue = {
@@ -50,9 +77,14 @@ def _create_missing_filtration_firewall_issue(ip, closed_ports):
         "Description": "The scan showed that only closed ports are present whereas they should be filtered"
                        "\n\n"
                        "Evidence --- Closed port(s) : " + closed_ports,
-        "URLs": [{"URL": ip}]
+        "URLs": [{"URL": ip}],
+        'Classification': {
+            'cwe_id': '200',
+            'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
+        }
     }
     return issue
+
 
 def find_open_ports(ip_address, ip_addresses):
     for address in ip_addresses:
@@ -75,7 +107,7 @@ def parse_nmap_output(output):
 
         match_service = re.match('^(\d+)/(tcp|udp)\s+(open|closed|filtered)\s+(\S+)\s*(.*)', line)
         if match_service is not None:
-            ips[current_ip].append({'port': int(match_service.group(1)), 'protocol': match_service.group(2),
+            ips[current_ip].append({'port': match_service.group(1), 'protocol': match_service.group(2),
                                     'state': match_service.group(3), 'service': match_service.group(4),
                                     'version': match_service.group(5)})
 
@@ -86,14 +118,15 @@ def parse_nmap_output(output):
     return ips
 
 
-def find_port_in_issues(port, issues):
-    for issue in issues:
-        if port in issue['Ports']:
-            return True
+def find_baseline_ports(ip, baseline):
+    for info in baseline:
+        if ip in info['address']:
+            return {'udp': info['udp'], 'tcp': info['tcp']}
+    return {'udp': [], 'tcp': []}
 
 
 def _validate_ports(ports):
-    # U:53,111,137,T:21-25,139,8080
+    # 53,111,137,T:21-25,139,8080
     return re.match(r"(((U|T):)\d+(-\d+)?)(,((U|T):)?\d+(-\d+)?)*", ports)
 
 
@@ -103,7 +136,6 @@ def _validate_open_ports(open_ports):
 
 
 class NMAPPlugin(ExternalProcessPlugin):
-
     PLUGIN_NAME = "NMAP"
     PLUGIN_VERSION = "0.2"
     PLUGIN_WEIGHT = "light"
@@ -127,12 +159,10 @@ class NMAPPlugin(ExternalProcessPlugin):
         issues = []
 
         for ip in ips:
-            addresses = []
             closed_ports = ""
             filtered_ports = ""
-            if "addresses" in self.configuration:
-                addresses = self.configuration["addresses"]
-            open_ports = find_open_ports(ip, addresses)
+            baseline_ports = find_baseline_ports(ip, self.baseline)
+            self.report_progress(33, baseline_ports)
 
             for service in ips[ip]:
                 if 'not_shown' in service:
@@ -142,7 +172,6 @@ class NMAPPlugin(ExternalProcessPlugin):
                         else:
                             closed_ports += ", \"Not shown closed ports\""
 
-
                     if service["not_shown"] == "filtered":
                         if not filtered_ports:
                             filtered_ports += "\"Not shown filtered ports\""
@@ -150,8 +179,14 @@ class NMAPPlugin(ExternalProcessPlugin):
                             filtered_ports += ", \"Not shown filtered ports\""
 
                 else:
-                    if service['state'] == 'open' and service['port'] not in open_ports:
-                        issues.append(_create_port_open_issue(ip, service['port']))
+                    self.report_progress(22, service['protocol'])
+                    self.report_progress(23, baseline_ports[service['protocol']])
+                    self.report_progress(24, service['port'])
+                    if service['state'] == 'open' and service['port'] not in baseline_ports[service['protocol']]:
+                        issues.append(_create_unauthorized_open_port_issue(ip, service['port'], service['protocol']))
+
+                    if service['state'] == 'open' and service['port'] in baseline_ports[service['protocol']]:
+                        issues.append(_create_authorized_open_port_issue(ip, service['port'], service['protocol']))
 
                     if service['state'] == 'closed':
                         if not closed_ports:
@@ -165,7 +200,7 @@ class NMAPPlugin(ExternalProcessPlugin):
                         else:
                             filtered_ports += ", " + str(service['port'])
 
-                    if service['version'] and service['version'] not in self.version_whitelist:
+                    if service['version'] and service['version'].lower() not in self.version_whitelist:
                         issues.append(_create_wordy_version_issue(ip, service))
 
             if closed_ports and filtered_ports:
@@ -176,6 +211,7 @@ class NMAPPlugin(ExternalProcessPlugin):
         return issues
 
     def do_start(self):
+
         nmap_path = self.locate_program(self.NMAP_NAME)
         if nmap_path is None:
             raise Exception("Cannot find nmap in path")
@@ -183,9 +219,13 @@ class NMAPPlugin(ExternalProcessPlugin):
         self.nmap_stdout = ""
         self.nmap_stderr = ""
 
+        self.baseline = []
+        if 'baseline' in self.configuration:
+            self.baseline = self.configuration.get('baseline')
+
         self.version_whitelist = []
         if 'version_whitelist' in self.configuration:
-            self.version_whitelist = self.configuration['version_whitelist']
+            self.version_whitelist = [v.lower() for v in self.configuration['version_whitelist']]
 
         try:
             target = netaddr.IPNetwork(self.configuration['target'])
@@ -196,16 +236,22 @@ class NMAPPlugin(ExternalProcessPlugin):
             except:
                 raise Exception("Input target is not an IP address or a network of IP addresses or a valid URL")
 
-        args = ["-sV", "-Pn"]
+        args = [nmap_path]
+        args += ["-sV", "-sT", "-sU", "-Pn", "-PS21,22,80,443", "-PE"]
+
         ports = self.configuration.get('ports')
         if ports:
             if not _validate_ports(ports):
                 raise Exception("Invalid ports specification")
             args += ["-p", ports]
 
+        interface = self.configuration.get('interface')
+        if interface:
+            args += ["-e", interface]
+
         args += [str(target)]
 
-        self.spawn(nmap_path, args)
+        self.spawn('/usr/bin/sudo', args)
 
     def do_process_stdout(self, data):
         self.nmap_stdout += data
