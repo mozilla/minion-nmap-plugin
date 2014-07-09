@@ -7,6 +7,7 @@ import re
 import os
 import collections
 import netaddr
+import uuid
 from urlparse import urlparse
 from minion.plugins.base import ExternalProcessPlugin
 
@@ -249,6 +250,11 @@ class NMAPPlugin(ExternalProcessPlugin):
         if interface:
             args += ["-e", interface]
 
+        self.output_id = str(uuid.uuid4())
+        self.xml_output = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "XMLOUTPUT_" + self.output_id + ".xml"
+
+        args += ["-oX", self.xml_output]
+
         args += [str(target)]
 
         self.spawn('/usr/bin/sudo', args)
@@ -267,6 +273,18 @@ class NMAPPlugin(ExternalProcessPlugin):
             issues = self.ips_to_issues(ips)
 
             self.report_issues(issues)
+
+            stdout_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDOUT_" + self.output_id
+            stderr_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDERR_" + self.output_id
+            with open(stdout_log, 'w+') as f:
+                f.write(self.nmap_stdout)
+            with open(stderr_log, 'w+') as f:
+                f.write(self.nmap_stderr)
+
+            self.report_artifacts("NMAP Output", [{"type": "txt", "path": stdout_log},
+                                                  {"type": "txt", "path": stderr_log}])
+            self.report_artifacts("NMAP XML Report", [{"type": "xml", "path": self.xml_output}])
+
             self.report_finish()
         else:
             self.report_finish("FAILED")
