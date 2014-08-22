@@ -109,7 +109,7 @@ def parse_nmap_output(output):
 
         match_service = re.match('^(\d+)/(tcp|udp)\s+(open|closed|filtered)\s+(\S+)\s*(.*)', line)
         if match_service is not None:
-            ips[current_ip].append({'port': match_service.group(1), 'protocol': match_service.group(2),
+            ips[current_ip].append({'port': int(match_service.group(1)), 'protocol': match_service.group(2),
                                     'state': match_service.group(3), 'service': match_service.group(4),
                                     'version': match_service.group(5)})
 
@@ -123,7 +123,9 @@ def parse_nmap_output(output):
 def find_baseline_ports(ip, baseline):
     for info in baseline:
         if ip in info['address']:
-            return {'udp': info['udp'], 'tcp': info['tcp']}
+            info_udp = info['udp'] if 'udp' in info else []
+            info_tcp = info['tcp'] if 'tcp' in info else []
+            return {'udp': info_udp, 'tcp': info_tcp}
     return {'udp': [], 'tcp': []}
 
 
@@ -164,7 +166,6 @@ class NMAPPlugin(ExternalProcessPlugin):
             closed_ports = ""
             filtered_ports = ""
             baseline_ports = find_baseline_ports(ip, self.baseline)
-            self.report_progress(33, baseline_ports)
 
             for service in ips[ip]:
                 if 'not_shown' in service:
@@ -251,7 +252,7 @@ class NMAPPlugin(ExternalProcessPlugin):
         self.output_id = str(uuid.uuid4())
         self.xml_output = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "XMLOUTPUT_" + self.output_id + ".xml"
 
-        args += ["-oX", self.xml_output]
+        args += ["-oX", self.xml_output, "--no-stylesheet"]
 
         args += [str(target)]
 
@@ -285,12 +286,14 @@ class NMAPPlugin(ExternalProcessPlugin):
             self.report_finish("FAILED", failure)
 
     def _save_artifacts(self):
-        stdout_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDOUT_" + self.output_id
-        stderr_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDERR_" + self.output_id
-        with open(stdout_log, 'w+') as f:
-            f.write(self.nmap_stdout)
-        with open(stderr_log, 'w+') as f:
-            f.write(self.nmap_stderr)
+        stdout_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDOUT_" + self.output_id + ".txt"
+        stderr_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDERR_" + self.output_id + ".txt"
+        if self.nmap_stdout:
+            with open(stdout_log, 'w+') as f:
+                f.write(self.nmap_stdout)
+        if self.nmap_stderr:
+            with open(stderr_log, 'w+') as f:
+                f.write(self.nmap_stderr)
 
         self.report_artifacts("NMAP Output", [stdout_log, stderr_log])
         self.report_artifacts("NMAP XML Report", [self.xml_output])
