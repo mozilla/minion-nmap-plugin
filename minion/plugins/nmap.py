@@ -288,12 +288,18 @@ class NMAPPlugin(ExternalProcessPlugin):
     def _save_artifacts(self):
         stdout_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDOUT_" + self.output_id + ".txt"
         stderr_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDERR_" + self.output_id + ".txt"
+        output_artifacts = []
+
         if self.nmap_stdout:
             with open(stdout_log, 'w+') as f:
                 f.write(self.nmap_stdout)
+            output_artifacts.append(stdout_log)
         if self.nmap_stderr:
             with open(stderr_log, 'w+') as f:
                 f.write(self.nmap_stderr)
+            output_artifacts.append(stderr_log)
 
-        self.report_artifacts("NMAP Output", [stdout_log, stderr_log])
-        self.report_artifacts("NMAP XML Report", [self.xml_output])
+        if output_artifacts:
+            self.report_artifacts("NMAP Output", output_artifacts)
+        if os.path.isfile(self.xml_output):
+            self.report_artifacts("NMAP XML Report", [self.xml_output])
