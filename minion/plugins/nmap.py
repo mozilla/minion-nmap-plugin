@@ -219,6 +219,11 @@ class NMAPPlugin(ExternalProcessPlugin):
         self.nmap_stdout = ""
         self.nmap_stderr = ""
 
+        if 'report_dir' in self.configuration:
+            self.report_dir = self.configuration['report_dir']
+        else:
+            self.report_dir = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/"
+
         self.baseline = []
         if 'baseline' in self.configuration:
             self.baseline = self.configuration.get('baseline')
@@ -250,7 +255,7 @@ class NMAPPlugin(ExternalProcessPlugin):
             args += ["-e", interface]
 
         self.output_id = str(uuid.uuid4())
-        self.xml_output = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "XMLOUTPUT_" + self.output_id + ".xml"
+        self.xml_output = self.report_dir + "XMLOUTPUT_" + self.output_id + ".xml"
 
         args += ["-oX", self.xml_output, "--no-stylesheet"]
 
@@ -286,8 +291,8 @@ class NMAPPlugin(ExternalProcessPlugin):
             self.report_finish("FAILED", failure)
 
     def _save_artifacts(self):
-        stdout_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDOUT_" + self.output_id + ".txt"
-        stderr_log = os.path.dirname(os.path.realpath(__file__)) + "/artifacts/" + "STDERR_" + self.output_id + ".txt"
+        stdout_log = self.report_dir + "STDOUT_" + self.output_id + ".txt"
+        stderr_log = self.report_dir + "STDERR_" + self.output_id + ".txt"
         output_artifacts = []
 
         if self.nmap_stdout:
