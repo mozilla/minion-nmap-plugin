@@ -13,6 +13,8 @@ from urlparse import urlparse
 from minion.plugins.base import ExternalProcessPlugin
 
 def _create_unauthorized_open_port_issue(ip, port, protocol):
+    # Get the severity of the port
+    
     issue = {
         'Severity': 'High',
         'Summary': ip + ': ' + str(port) + '/' + str(protocol) + ' open (unauthorized)',
@@ -182,7 +184,7 @@ class NMAPPlugin(ExternalProcessPlugin):
                             filtered_ports += ", \"Not shown filtered ports\""
 
                 else:
-                    if service['state'] == 'open' and service['port'] not in baseline_ports[service['protocol']]:
+                    if service['state'] == 'open' and service['port'] not in baseline_ports[service['protocol']] and not self.configuration.get('noPortIssue'):
                         issues.append(_create_unauthorized_open_port_issue(ip, service['port'], service['protocol']))
 
                     if service['state'] == 'open' and service['port'] in baseline_ports[service['protocol']]:
