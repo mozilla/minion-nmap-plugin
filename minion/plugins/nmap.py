@@ -12,11 +12,12 @@ import socket
 from urlparse import urlparse
 from minion.plugins.base import ExternalProcessPlugin
 
-def _create_unauthorized_open_port_issue(ip, port, protocol):
+def _create_unauthorized_open_port_issue(ip, port, protocol, port_severity):
     # Get the severity of the port
-    
+    sev = find_open_port_severity(str(port) + '/' + str(protocol), port_severity)
+
     issue = {
-        'Severity': 'High',
+        'Severity': sev,
         'Summary': ip + ': ' + str(port) + '/' + str(protocol) + ' open (unauthorized)',
         'Description': 'Unauthorized open port for this host',
         'URLs': [{'URL': ip}],
@@ -96,6 +97,24 @@ def find_open_ports(ip_address, ip_addresses):
             return address["ports"]
     return []
 
+# Function used to find the severity of the open port according to the configuration in the plan
+#   port - opened port in string like "80/tcp" ou "53/udp"
+#   port_severity - dictionary containing a classification of severity for open port
+# return - string in (LOW, MEDIUM, HIGH)
+def find_open_port_severity(port, port_severity):
+    # Get the port list for each severity
+    for sev in port_severity:
+        # Check if the port is defined in the severity
+        if port in port_severity[sev]:
+            return sev
+
+    # Check if a default severity is defined
+    if "default" in port_severity:
+        return port_severity["default"]
+
+    # Default return if no severity has been defined
+    return "HIGH"
+
 
 def parse_nmap_output(output):
     ips = collections.OrderedDict()
@@ -148,6 +167,8 @@ class NMAPPlugin(ExternalProcessPlugin):
 
     NMAP_NAME = "nmap"
 
+    port_severity = []
+
     def _load_whitelist(self, conf_path):
 
         if not os.path.isfile(conf_path):
@@ -185,7 +206,7 @@ class NMAPPlugin(ExternalProcessPlugin):
 
                 else:
                     if service['state'] == 'open' and service['port'] not in baseline_ports[service['protocol']] and not self.configuration.get('noPortIssue'):
-                        issues.append(_create_unauthorized_open_port_issue(ip, service['port'], service['protocol']))
+                        issues.append(_create_unauthorized_open_port_issue(ip, service['port'], service['protocol'], self.port_severity))
 
                     if service['state'] == 'open' and service['port'] in baseline_ports[service['protocol']]:
                         issues.append(_create_authorized_open_port_issue(ip, service['port'], service['protocol']))
@@ -233,6 +254,12 @@ class NMAPPlugin(ExternalProcessPlugin):
         self.version_whitelist = []
         if 'version_whitelist' in self.configuration:
             self.version_whitelist = [v.lower() for v in self.configuration['version_whitelist']]
+
+        # Check if there a rule to assign severity to unauthorized open port
+        # The [0] is used to get the dictionary inside the array
+        self.port_severity = []
+        if 'severity' in self.configuration:
+            self.port_severity = self.configuration.get('severity')[0]
 
         try:
             target = netaddr.IPNetwork(self.configuration['target'])
@@ -320,3 +347,7 @@ class NMAPPlugin(ExternalProcessPlugin):
             self.report_artifacts("NMAP Output", output_artifacts)
         if os.path.isfile(self.xml_output):
             self.report_artifacts("NMAP XML Report", [self.xml_output])
+
+    # Getter for the severity list
+    def get_severity(self):
+        return self.port_severity
