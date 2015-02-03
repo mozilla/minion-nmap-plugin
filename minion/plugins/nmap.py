@@ -100,7 +100,7 @@ def find_open_ports(ip_address, ip_addresses):
 # Function used to find the severity of the open port according to the configuration in the plan
 #   port - opened port in string like "80/tcp" ou "53/udp"
 #   port_severity - dictionary containing a classification of severity for open port
-# return - string in (LOW, MEDIUM, HIGH)
+# return - string in (Low, Medium, High)
 def find_open_port_severity(port, port_severity):
     # Get the port list for each severity
     for sev in port_severity:
@@ -113,7 +113,7 @@ def find_open_port_severity(port, port_severity):
         return port_severity["default"]
 
     # Default return if no severity has been defined
-    return "HIGH"
+    return "High"
 
 
 def parse_nmap_output(output):
