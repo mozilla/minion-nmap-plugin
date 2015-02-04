@@ -10,6 +10,8 @@ import netaddr
 import uuid
 import socket
 from urlparse import urlparse
+from netaddr import IPNetwork, IPAddress
+
 from minion.plugins.base import ExternalProcessPlugin
 
 def _create_unauthorized_open_port_issue(ip, port, protocol, port_severity):
@@ -142,11 +144,28 @@ def parse_nmap_output(output):
 
 
 def find_baseline_ports(ip, baseline):
+    default = {}
+    # Browse each entry of the baseline
     for info in baseline:
-        if ip in info['address']:
-            info_udp = info['udp'] if 'udp' in info else []
-            info_tcp = info['tcp'] if 'tcp' in info else []
-            return {'udp': info_udp, 'tcp': info_tcp}
+        try:
+            # check if address is a well formatted CIDR
+            network = IPNetwork(info['address'])
+
+            # Check if the ip is inside the network
+            if IPAddress(ip) in network:
+                # Get the port lists
+                info_udp = info['udp'] if 'udp' in info else []
+                info_tcp = info['tcp'] if 'tcp' in info else []
+                return {'udp': info_udp, 'tcp': info_tcp}
+        except Exception as e:
+            # Store rules if it's the default baseline
+            if "default" == info['address']:
+                info_udp = info['udp'] if 'udp' in info else []
+                info_tcp = info['tcp'] if 'tcp' in info else []
+                default = {'udp': info_udp, 'tcp': info_tcp}
+    # Try to retrieve the default rule
+    if default != {}:
+        return default
     return {'udp': [], 'tcp': []}
 
 
@@ -205,11 +224,11 @@ class NMAPPlugin(ExternalProcessPlugin):
                             filtered_ports += ", \"Not shown filtered ports\""
 
                 else:
-                    if service['state'] == 'open' and service['port'] not in baseline_ports[service['protocol']] and not self.configuration.get('noPortIssue'):
-                        issues.append(_create_unauthorized_open_port_issue(ip, service['port'], service['protocol'], self.port_severity))
-
-                    if service['state'] == 'open' and service['port'] in baseline_ports[service['protocol']]:
+                    if service['state'] == 'open' and str(service['port']) in baseline_ports[service['protocol']]:
                         issues.append(_create_authorized_open_port_issue(ip, service['port'], service['protocol']))
+
+                    if service['state'] == 'open' and str(service['port']) not in baseline_ports[service['protocol']] and not self.configuration.get('noPortIssue'):
+                        issues.append(_create_unauthorized_open_port_issue(ip, service['port'], service['protocol'], self.port_severity))
 
                     if service['state'] == 'closed':
                         if not closed_ports:
