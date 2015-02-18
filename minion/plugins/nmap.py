@@ -168,6 +168,27 @@ def find_baseline_ports(ip, baseline):
         return default
     return {'udp': [], 'tcp': []}
 
+# Get all the ports used in the baseline.
+# param baseline : the baseline from the plan
+# return : dictionary containing array of ports with key 'udp' and 'tcp'
+def get_all_baseline_ports(baseline):
+    udp = []
+    tcp = []
+
+    # Browse each entry of the baseline
+    for info in baseline:
+        # add udp and tcp ports
+        udp += info['udp'] if 'udp' in info else []
+        tcp += info['tcp'] if 'tcp' in info else []
+
+    # Trim to remove duplicate value
+    tmp = set(udp)
+    udp = list(tmp)
+    tmp = set(tcp)
+    tcp = list(tmp)
+
+    return  {'udp': udp, 'tcp': tcp}
+
 
 def _validate_ports(ports):
     # 53,111,137,T:21-25,139,8080
@@ -306,6 +327,22 @@ class NMAPPlugin(ExternalProcessPlugin):
         if ports:
             if not _validate_ports(ports):
                 raise Exception("Invalid ports specification")
+
+            # Check if the scan needs to include all the baseline ports
+            if "baseline_port" in self.configuration:
+                # get all the ports in the baseline
+                base_port = get_all_baseline_ports(self.baseline)
+
+                # add tcp ports
+                for tcp_port in base_port["tcp"]:
+                    ports += ",T:" + tcp_port
+
+                # add udp ports
+                for udp_port in base_port["udp"]:
+                    ports += ",U:" + udp_port
+
+                # FIXME: some ports are duplicated but nmap will just echo an easter-warning
+
             args += ["-p", ports]
 
         interface = self.configuration.get('interface')
