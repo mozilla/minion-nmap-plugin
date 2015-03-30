@@ -9,6 +9,7 @@ import collections
 import netaddr
 import uuid
 import socket
+import json
 from urlparse import urlparse
 from netaddr import IPNetwork, IPAddress
 
@@ -290,6 +291,14 @@ class NMAPPlugin(ExternalProcessPlugin):
         self.baseline = []
         if 'baseline' in self.configuration:
             self.baseline = self.configuration.get('baseline')
+
+            # Check if the baseline is a path to load the external file
+            if isinstance(self.baseline, basestring):
+                try:
+                    with open(self.baseline) as base_json:
+                        self.baseline = json.load(base_json)
+                except Exception:
+                    raise Exception("Cannot load baseline file")
 
         self.version_whitelist = []
         if 'version_whitelist' in self.configuration:
