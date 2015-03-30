@@ -119,17 +119,28 @@ def find_open_port_severity(port, port_severity):
     return "High"
 
 
+# TODO get xml output instead of ugly regex parsing
 def parse_nmap_output(output):
     ips = collections.OrderedDict()
     for line in output.split("\n"):
 
-        match_ip = re.match('^Nmap\sscan\sreport\sfor\s(([0-9.]+)|\S+\s\(([0-9.]+)\))', line)
+        # Match ip with the format: Nmap scan report for IPV4
+        match_ip = re.match('^Nmap\sscan\sreport\sfor\s(([0-9]{1,3}\.){3}([0-9]{1,3}))', line)
         if match_ip is not None:
-            if match_ip.group(2) is not None:
-                current_ip = match_ip.group(2)
-            else:
-                current_ip = match_ip.group(3)
+            current_ip = match_ip.group(1)
             ips[current_ip] = []
+        else:
+            # Match ip with the format: Nmap scan report for 1-2.fqdn-1.4 (IPV4)
+            match_ip = re.match('^Nmap\sscan\sreport\sfor\s(([a-z0-9_\-.]+)\s\((([0-9]{1,3}\.){3}([0-9]{1,3}))\))', line)
+            if match_ip is not None:
+                current_ip = match_ip.group(3)
+                ips[current_ip] = []
+            else:
+                # Match ip with the format: Nmap scan report for 1-2.fqdn-1.4 (IPV6)
+                match_ip = re.match('^Nmap\sscan\sreport\sfor\s(([a-z0-9_\-.]+)\s\((([a-f0-9:]+))\))', line)
+                if match_ip is not None:
+                    current_ip = match_ip.group(3)
+                    ips[current_ip] = []
 
         match_service = re.match('^(\d+)/(tcp|udp)\s+(open|closed|filtered)\s+(\S+)\s*(.*)', line)
         if match_service is not None:
