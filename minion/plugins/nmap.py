@@ -257,7 +257,7 @@ class NMAPPlugin(ExternalProcessPlugin):
                             filtered_ports += ", \"Not shown filtered ports\""
 
                 else:
-                    if service['state'] == 'open' and str(service['port']) in baseline_ports[service['protocol']]:
+                    if service['state'] == 'open' and str(service['port']) in baseline_ports[service['protocol']] and not self.configuration.get('noPortIssue'):
                         issues.append(_create_authorized_open_port_issue(ip, service['port'], service['protocol']))
 
                     if service['state'] == 'open' and str(service['port']) not in baseline_ports[service['protocol']] and not self.configuration.get('noPortIssue'):
