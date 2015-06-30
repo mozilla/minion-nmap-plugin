@@ -131,7 +131,10 @@ class NMAPPlugin(ExternalProcessPlugin):
             if not self._validate_ports(ports):
                 raise Exception("Invalid ports specification")
             args += ["-p", ports]
-        args += [u.hostname]
+
+        if 'hostname' in u: args += [u.hostname]
+        else: args += [self.configuration['target']]
+
         self.spawn(nmap_path, args)
 
     def do_process_stdout(self, data):
