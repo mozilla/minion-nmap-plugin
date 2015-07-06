@@ -10,12 +10,14 @@ import netaddr
 import uuid
 import socket
 import json
+import xml.etree.cElementTree as Et
 from urlparse import urlparse
 from netaddr import IPNetwork, IPAddress
 
 from minion.plugins.base import ExternalProcessPlugin
 
-def _create_unauthorized_open_port_issue(ip, port, protocol, port_severity):
+
+def _create_unauthorized_open_port_issue(ip, port, protocol, port_severity, hostnames):
     # Get the severity of the port
     sev = find_open_port_severity(str(port) + '/' + str(protocol), port_severity)
 
@@ -30,10 +32,15 @@ def _create_unauthorized_open_port_issue(ip, port, protocol, port_severity):
             'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
         }
     }
+
+    # Add hostname to description if available
+    if hostnames:
+        issue['Description'] += ' ' + hostnames[0]
+
     return issue
 
 
-def _create_authorized_open_port_issue(ip, port, protocol):
+def _create_authorized_open_port_issue(ip, port, protocol, hostnames):
     issue = {
         'Severity': 'Info',
         'Summary': ip + ': ' + str(port) + '/' + str(protocol) + ' open (authorized)',
@@ -45,13 +52,19 @@ def _create_authorized_open_port_issue(ip, port, protocol):
             'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
         }
     }
+
+    # Add hostname to description if available
+    if hostnames:
+        issue['Description'] += ' ' + hostnames[0]
+
     return issue
 
-def _create_wordy_version_issue(ip, service):
+
+def _create_wordy_version_issue(ip, service, hostnames):
     issue = {
         'Severity': 'Low',
         'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + ' open: "' + service['version'] + '" (information disclosure)',
-        'Description': 'Information disclosure',
+        'Description': 'Information disclosure for this host',
         'URLs': [{'URL': ip}],
         'Ports': [service['port']],
         'Classification': {
@@ -59,10 +72,15 @@ def _create_wordy_version_issue(ip, service):
             'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
         }
     }
+
+    # Add hostname to description if available
+    if hostnames:
+        issue['Description'] += ' ' + hostnames[0]
+
     return issue
 
 
-def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports):
+def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, hostnames):
     issue = {
         "Severity": "Medium",
         "Summary": ip + " - Probably misconfigured firewall",
@@ -75,22 +93,34 @@ def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports):
             'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
         }
     }
+
+    # Add hostname to description if available
+    if hostnames:
+        issue['Description'] += ' ' + hostnames[0]
+
     return issue
 
 
-def _create_missing_filtration_firewall_issue(ip, closed_ports):
+def _create_missing_filtration_firewall_issue(ip, closed_ports, hostnames):
     issue = {
         "Severity": "Medium",
         "Summary": ip + " - Probably missing rules in firewall or no firewall at all",
         "Description": "The scan showed that only closed ports are present whereas they should be filtered"
                        "\n\n"
-                       "Evidence --- Closed port(s) : " + closed_ports,
+                       "Evidence --- Closed port(s) : " + closed_ports +
+                       "\n\n"
+                       "for this host",
         "URLs": [{"URL": ip}],
         'Classification': {
             'cwe_id': '200',
             'cwe_url': 'http://cwe.mitre.org/data/definitions/200.html'
         }
     }
+
+    # Add hostname to description if available
+    if hostnames:
+        issue['Description'] += ' ' + hostnames[0]
+
     return issue
 
 
@@ -99,6 +129,7 @@ def find_open_ports(ip_address, ip_addresses):
         if ip_address in address["address"]:
             return address["ports"]
     return []
+
 
 # Function used to find the severity of the open port according to the configuration in the plan
 #   port - opened port in string like "80/tcp" ou "53/udp"
@@ -155,6 +186,54 @@ def parse_nmap_output(output):
     return ips
 
 
+def parse_nmap_xml(output):
+    ips = collections.OrderedDict()
+
+    try:
+        tree = Et.parse(output)
+    except:
+        raise Exception("The xml output can't be found or opened")
+
+    root = tree.getroot()
+
+    # Get every host found
+    for host in root.findall("host"):
+        # Get the IP
+        current_ip = host.find('address').get('addr')
+        ips[current_ip] = []
+
+        # Get the hostname if defined
+        hostnames = []
+        for hn in host.find('hostnames'):
+            hostnames.append(hn.get('name'))
+
+        # Add hostname to return
+        if hostnames:
+            ips[current_ip].append({'hostnames': hostnames})
+
+        # Get opened ports
+        ports = host.find('ports')
+        for opened in ports.findall('port'):
+            port = opened.get('portid')
+            protocol = opened.get('protocol')
+            state = opened.find('state').get('state')
+            service = opened.find('service')
+            service_name = service.get('name')
+            service_product = service.get('product')
+
+            # Add port info to finding list
+            ips[current_ip].append({'port': int(port), 'protocol': protocol, 'state': state,
+                                    'service': service_name, 'version': str(service_product)})
+
+        # Check if there are extra ports closed
+        for extra in ports.findall('extraports'):
+            if extra.get('state') == 'closed':
+                # Add information for analyzing firewall rule later
+                ips[current_ip].append({'not_shown': 'closed'})
+
+    return ips
+
+
 def find_baseline_ports(ip, baseline):
     default = {}
     # Browse each entry of the baseline
@@ -180,6 +259,7 @@ def find_baseline_ports(ip, baseline):
         return default
     return {'udp': [], 'tcp': []}
 
+
 # Get all the ports used in the baseline.
 # param baseline : the baseline from the plan
 # return : dictionary containing array of ports with key 'udp' and 'tcp'
@@ -199,7 +279,7 @@ def get_all_baseline_ports(baseline):
     tmp = set(tcp)
     tcp = list(tmp)
 
-    return  {'udp': udp, 'tcp': tcp}
+    return {'udp': udp, 'tcp': tcp}
 
 
 def _validate_ports(ports):
@@ -241,8 +321,12 @@ class NMAPPlugin(ExternalProcessPlugin):
             closed_ports = ""
             filtered_ports = ""
             baseline_ports = find_baseline_ports(ip, self.baseline)
+            hostnames = []
 
             for service in ips[ip]:
+                # Keep track of ip hostnames
+                if 'hostnames' in service:
+                    hostnames = service['hostnames']
                 if 'not_shown' in service:
                     if service["not_shown"] == "closed":
                         if not closed_ports:
@@ -256,12 +340,17 @@ class NMAPPlugin(ExternalProcessPlugin):
                         else:
                             filtered_ports += ", \"Not shown filtered ports\""
 
-                else:
-                    if service['state'] == 'open' and str(service['port']) in baseline_ports[service['protocol']] and not self.configuration.get('noPortIssue'):
-                        issues.append(_create_authorized_open_port_issue(ip, service['port'], service['protocol']))
+                elif "state" in service:
 
-                    if service['state'] == 'open' and str(service['port']) not in baseline_ports[service['protocol']] and not self.configuration.get('noPortIssue'):
-                        issues.append(_create_unauthorized_open_port_issue(ip, service['port'], service['protocol'], self.port_severity))
+                    if service['state'] == 'open' and str(service['port']) in baseline_ports[service['protocol']] \
+                            and not self.configuration.get('noPortIssue'):
+                        issues.append(_create_authorized_open_port_issue(ip, service['port'],
+                                                                         service['protocol'], hostnames))
+
+                    if service['state'] == 'open' and str(service['port']) not in baseline_ports[service['protocol']] \
+                            and not self.configuration.get('noPortIssue'):
+                        issues.append(_create_unauthorized_open_port_issue(ip, service['port'], service['protocol'],
+                                                                           self.port_severity, hostnames))
 
                     if service['state'] == 'closed':
                         if not closed_ports:
@@ -276,12 +365,12 @@ class NMAPPlugin(ExternalProcessPlugin):
                             filtered_ports += ", " + str(service['port'])
 
                     if service['version'] and service['version'].lower() not in self.version_whitelist:
-                        issues.append(_create_wordy_version_issue(ip, service))
+                        issues.append(_create_wordy_version_issue(ip, service, hostnames))
 
             if closed_ports and filtered_ports:
-                issues.append(_create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports))
+                issues.append(_create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, hostnames))
             elif closed_ports:
-                issues.append(_create_missing_filtration_firewall_issue(ip, closed_ports))
+                issues.append(_create_missing_filtration_firewall_issue(ip, closed_ports, hostnames))
 
         return issues
 
@@ -388,7 +477,7 @@ class NMAPPlugin(ExternalProcessPlugin):
         if self.stopping and status == 9:
             self.report_finish("STOPPED")
         elif status == 0:
-            ips = parse_nmap_output(self.nmap_stdout)
+            ips = parse_nmap_xml(self.xml_output)
             issues = self.ips_to_issues(ips)
 
             self.report_issues(issues)
