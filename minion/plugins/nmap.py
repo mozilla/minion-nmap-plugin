@@ -150,42 +150,6 @@ def find_open_port_severity(port, port_severity):
     return "High"
 
 
-# TODO get xml output instead of ugly regex parsing
-def parse_nmap_output(output):
-    ips = collections.OrderedDict()
-    for line in output.split("\n"):
-
-        # Match ip with the format: Nmap scan report for IPV4
-        match_ip = re.match('^Nmap\sscan\sreport\sfor\s(([0-9]{1,3}\.){3}([0-9]{1,3}))', line)
-        if match_ip is not None:
-            current_ip = match_ip.group(1)
-            ips[current_ip] = []
-        else:
-            # Match ip with the format: Nmap scan report for 1-2.fqdn-1.4 (IPV4)
-            match_ip = re.match('^Nmap\sscan\sreport\sfor\s(([a-z0-9_\-.]+)\s\((([0-9]{1,3}\.){3}([0-9]{1,3}))\))', line)
-            if match_ip is not None:
-                current_ip = match_ip.group(3)
-                ips[current_ip] = []
-            else:
-                # Match ip with the format: Nmap scan report for 1-2.fqdn-1.4 (IPV6)
-                match_ip = re.match('^Nmap\sscan\sreport\sfor\s(([a-z0-9_\-.]+)\s\((([a-f0-9:]+))\))', line)
-                if match_ip is not None:
-                    current_ip = match_ip.group(3)
-                    ips[current_ip] = []
-
-        match_service = re.match('^(\d+)/(tcp|udp)\s+(open|closed|filtered)\s+(\S+)\s*(.*)', line)
-        if match_service is not None:
-            ips[current_ip].append({'port': int(match_service.group(1)), 'protocol': match_service.group(2),
-                                    'state': match_service.group(3), 'service': match_service.group(4),
-                                    'version': match_service.group(5)})
-
-        match_not_show = re.match('^Not\sshown:\s\d+\s(closed|filtered)\sports', line)
-        if match_not_show is not None:
-            ips[current_ip].append({'not_shown': match_not_show.group(1)})
-
-    return ips
-
-
 def parse_nmap_xml(output):
     ips = collections.OrderedDict()
 
@@ -223,7 +187,7 @@ def parse_nmap_xml(output):
 
             # Add port info to finding list
             ips[current_ip].append({'port': int(port), 'protocol': protocol, 'state': state,
-                                    'service': service_name, 'version': str(service_product)})
+                                    'service': service_name, 'version': service_product})
 
         # Check if there are extra ports closed
         for extra in ports.findall('extraports'):
@@ -364,7 +328,8 @@ class NMAPPlugin(ExternalProcessPlugin):
                         else:
                             filtered_ports += ", " + str(service['port'])
 
-                    if service['version'] and service['version'].lower() not in self.version_whitelist:
+                    if service['version'] and service['version'] != 'None' \
+                            and service['version'].lower() not in self.version_whitelist:
                         issues.append(_create_wordy_version_issue(ip, service, hostnames))
 
             if closed_ports and filtered_ports:
