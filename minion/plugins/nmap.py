@@ -17,7 +17,7 @@ from netaddr import IPNetwork, IPAddress
 from minion.plugins.base import ExternalProcessPlugin
 
 
-def _create_unauthorized_open_port_issue(ip, port, protocol, port_severity, hostnames):
+def _create_unauthorized_open_port_issue(ip, port, protocol, port_severity, hostname):
     # Get the severity of the port
     sev = find_open_port_severity(str(port) + '/' + str(protocol), port_severity)
 
@@ -34,13 +34,13 @@ def _create_unauthorized_open_port_issue(ip, port, protocol, port_severity, host
     }
 
     # Add hostname to description if available
-    if hostnames:
-        issue['Description'] += ' ' + hostnames[0]
+    if hostname:
+        issue['Description'] += ' ' + hostname
 
     return issue
 
 
-def _create_authorized_open_port_issue(ip, port, protocol, hostnames):
+def _create_authorized_open_port_issue(ip, port, protocol, hostname):
     issue = {
         'Severity': 'Info',
         'Summary': ip + ': ' + str(port) + '/' + str(protocol) + ' open (authorized)',
@@ -54,13 +54,13 @@ def _create_authorized_open_port_issue(ip, port, protocol, hostnames):
     }
 
     # Add hostname to description if available
-    if hostnames:
-        issue['Description'] += ' ' + hostnames[0]
+    if hostname:
+        issue['Description'] += ' ' + hostname
 
     return issue
 
 
-def _create_wordy_version_issue(ip, service, hostnames):
+def _create_wordy_version_issue(ip, service, hostname):
     issue = {
         'Severity': 'Low',
         'Summary': ip + ': ' + str(service['port']) + '/' + str(service['protocol']) + ' open: "' + service['version'] + '" (information disclosure)',
@@ -74,19 +74,21 @@ def _create_wordy_version_issue(ip, service, hostnames):
     }
 
     # Add hostname to description if available
-    if hostnames:
-        issue['Description'] += ' ' + hostnames[0]
+    if hostname:
+        issue['Description'] += ' ' + hostnames
 
     return issue
 
 
-def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, hostnames):
+def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, hostname):
     issue = {
         "Severity": "Medium",
         "Summary": ip + " - Probably misconfigured firewall",
         "Description": "The scan showed that both closed and filtered ports are present whereas they should be filtered"
                        "\n\n"
-                       "Evidence --- Closed port(s) : " + closed_ports + " - Filtered port(s) : " + filtered_ports,
+                       "Evidence --- Closed port(s) : " + closed_ports + " - Filtered port(s) : " + filtered_ports +
+                       "\n\n"
+                       "for this host",
         "URLs": [{"URL": ip}],
         'Classification': {
             'cwe_id': '200',
@@ -95,13 +97,13 @@ def _create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, host
     }
 
     # Add hostname to description if available
-    if hostnames:
-        issue['Description'] += ' ' + hostnames[0]
+    if hostname:
+        issue['Description'] += ' ' + hostname
 
     return issue
 
 
-def _create_missing_filtration_firewall_issue(ip, closed_ports, hostnames):
+def _create_missing_filtration_firewall_issue(ip, closed_ports, hostname):
     issue = {
         "Severity": "Medium",
         "Summary": ip + " - Probably missing rules in firewall or no firewall at all",
@@ -118,8 +120,8 @@ def _create_missing_filtration_firewall_issue(ip, closed_ports, hostnames):
     }
 
     # Add hostname to description if available
-    if hostnames:
-        issue['Description'] += ' ' + hostnames[0]
+    if hostname:
+        issue['Description'] += ' ' + hostname
 
     return issue
 
@@ -150,6 +152,9 @@ def find_open_port_severity(port, port_severity):
     return "High"
 
 
+# Function used to parse the XML output of Nmap in order to raise issues
+#   output - xml to parse into a DOM tree
+# return - Ordered dictionary containing issues for each host
 def parse_nmap_xml(output):
     ips = collections.OrderedDict()
 
@@ -167,13 +172,13 @@ def parse_nmap_xml(output):
         ips[current_ip] = []
 
         # Get the hostname if defined
-        hostnames = []
+        hostname = ""
         for hn in host.find('hostnames'):
-            hostnames.append(hn.get('name'))
+            hostname = hn.get('name') + " "
 
         # Add hostname to return
-        if hostnames:
-            ips[current_ip].append({'hostnames': hostnames})
+        if hostname:
+            ips[current_ip].append({'hostname': hostname})
 
         # Get opened ports
         ports = host.find('ports')
@@ -277,20 +282,25 @@ class NMAPPlugin(ExternalProcessPlugin):
         except Exception as e:
             raise Exception("Can't open the file for the given path")
 
+    # Function used to generate issues from parsed data of nmap output
     def ips_to_issues(self, ips):
 
         issues = []
 
+        # Look up for each host
         for ip in ips:
             closed_ports = ""
             filtered_ports = ""
             baseline_ports = find_baseline_ports(ip, self.baseline)
-            hostnames = []
+            hostname = ""
 
+            # Investigate each service running on the host
             for service in ips[ip]:
-                # Keep track of ip hostnames
-                if 'hostnames' in service:
-                    hostnames = service['hostnames']
+                # Keep track of ip hostname
+                if 'hostname' in service:
+                    hostname = service['hostname']
+
+                # Keep track of the state of the not shown services
                 if 'not_shown' in service:
                     if service["not_shown"] == "closed":
                         if not closed_ports:
@@ -304,38 +314,43 @@ class NMAPPlugin(ExternalProcessPlugin):
                         else:
                             filtered_ports += ", \"Not shown filtered ports\""
 
+                # Investigate interesting state for found services
                 elif "state" in service:
-
+                    # Treat case Authorized open port and the report Open Port flag is On
                     if service['state'] == 'open' and str(service['port']) in baseline_ports[service['protocol']] \
                             and not self.configuration.get('noPortIssue'):
                         issues.append(_create_authorized_open_port_issue(ip, service['port'],
-                                                                         service['protocol'], hostnames))
-
+                                                                         service['protocol'], hostname))
+                    # Treat case Unauthorized open port and the report Open Port flag is On
                     if service['state'] == 'open' and str(service['port']) not in baseline_ports[service['protocol']] \
                             and not self.configuration.get('noPortIssue'):
                         issues.append(_create_unauthorized_open_port_issue(ip, service['port'], service['protocol'],
-                                                                           self.port_severity, hostnames))
+                                                                           self.port_severity, hostname))
 
+                    # Keep track of closed ports for firewall rules analysis
                     if service['state'] == 'closed':
                         if not closed_ports:
                             closed_ports += str(service['port'])
                         else:
                             closed_ports += ", " + str(service['port'])
 
+                    # Keep track of filtered ports for firewall rules analysis
                     if service['state'] == 'filtered':
                         if not filtered_ports:
                             filtered_ports += str(service['port'])
                         else:
                             filtered_ports += ", " + str(service['port'])
 
+                    # Check information disclosure for precise service version
                     if service['version'] and service['version'] != 'None' \
                             and service['version'].lower() not in self.version_whitelist:
-                        issues.append(_create_wordy_version_issue(ip, service, hostnames))
+                        issues.append(_create_wordy_version_issue(ip, service, hostname))
 
+            # Check broken firewall rules
             if closed_ports and filtered_ports:
-                issues.append(_create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, hostnames))
+                issues.append(_create_bad_filtration_firewall_issue(ip, closed_ports, filtered_ports, hostname))
             elif closed_ports:
-                issues.append(_create_missing_filtration_firewall_issue(ip, closed_ports, hostnames))
+                issues.append(_create_missing_filtration_firewall_issue(ip, closed_ports, hostname))
 
         return issues
 
