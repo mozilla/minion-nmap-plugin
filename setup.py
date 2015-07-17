@@ -5,7 +5,7 @@
 from setuptools import setup
 
 install_requires = [
-    'netaddr==0.7.11',
+    'netaddr>=0.7.11',
     'minion-backend'
 ]
 

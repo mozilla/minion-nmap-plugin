@@ -75,7 +75,7 @@ def _create_wordy_version_issue(ip, service, hostname):
 
     # Add hostname to description if available
     if hostname:
-        issue['Description'] += ' ' + hostnames
+        issue['Description'] += ' ' + hostname
 
     return issue
 
@@ -399,15 +399,15 @@ class NMAPPlugin(ExternalProcessPlugin):
             except:
                 raise Exception("Input target is not an IP address or a network of IP addresses or a valid URL")
 
-        ### Check if parameters are specified (syntax "Parm1 Parm2 etc"
+        # Check if parameters are specified (syntax "Parm1 Parm2 etc"
         params = []
         if 'parameters' in self.configuration:
             params = self.configuration.get('parameters')
 
-            ### Put parameters into array
+            # Put parameters into array
             params = params.split()
         else:
-            ### Use default parameters
+            # Use default parameters
             params = ["-sV", "-sT", "-sU", "-Pn", "-PS21,22,80,443", "-PE"]
         args = [nmap_path]
         args += params
