@@ -1,0 +1,96 @@
+<?xml version="1.0"?>
+<!-- Nmap 6.40 scan initiated Fri Aug 14 18:54:03 2015 as: nmap -oX etc/sample-nmap-output.xml -&#45;no-stylesheet -&#45;top-ports 100 -sTV 192.168.0.0/29 -->
+<nmaprun scanner="nmap" args="nmap -oX etc/sample-nmap-output.xml -&#45;no-stylesheet -&#45;top-ports 100 -sTV 192.168.0.0/29" start="1439578443" startstr="Fri Aug 14 18:54:03 2015" version="6.40" xmloutputversion="1.04">
+<scaninfo type="connect" protocol="tcp" numservices="100" services="7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6646,7070,8000,8008-8009,8080-8081,8443,8888,9100,9999-10000,32768,49152-49157"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<host starttime="1439578443" endtime="1439578460"><status state="up" reason="reset" reason_ttl="255"/>
+<address addr="192.168.0.0" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="100">
+<extrareasons reason="net-unreaches" count="100"/>
+</extraports>
+</ports>
+<times srtt="756" rttvar="606" to="100000"/>
+</host>
+<host starttime="1439578443" endtime="1439578601"><status state="up" reason="echo-reply" reason_ttl="58"/>
+<address addr="192.168.0.1" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="97">
+<extrareasons reason="conn-refused" count="97"/>
+</extraports>
+<port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="ssh" product="OpenSSH" version="6.2" extrainfo="protocol 2.0" method="probed" conf="10"><cpe>cpe:/a:openbsd:openssh:6.2</cpe></service></port>
+<port protocol="tcp" portid="88"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="kerberos-sec" product="Heimdal Kerberos" extrainfo="server time: 2015-08-14 18:54:26Z" method="probed" conf="10"><cpe>cpe:/a:heimdal:kerberos</cpe></service></port>
+<port protocol="tcp" portid="548"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="afp" method="table" conf="3"/></port>
+</ports>
+<times srtt="3068" rttvar="1217" to="100000"/>
+</host>
+<host starttime="1439578443" endtime="1439578460"><status state="up" reason="reset" reason_ttl="255"/>
+<address addr="192.168.0.2" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="99">
+<extrareasons reason="conn-refused" count="99"/>
+</extraports>
+<port protocol="tcp" portid="3306"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="mysql" product="MySQL" version="5.0.54" method="probed" conf="3"/></port>
+</ports>
+<times srtt="2845" rttvar="512" to="100000"/>
+</host>
+<host starttime="1439578443" endtime="1439578460"><status state="up" reason="reset" reason_ttl="255"/>
+<address addr="192.168.0.3" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="100">
+<extrareasons reason="net-unreaches" count="100"/>
+</extraports>
+</ports>
+<times srtt="1498" rttvar="625" to="100000"/>
+</host>
+<host starttime="1439578443" endtime="1439578466"><status state="up" reason="echo-reply" reason_ttl="36"/>
+<address addr="192.168.0.4" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="closed" count="98">
+<extrareasons reason="conn-refused" count="98"/>
+</extraports>
+<port protocol="tcp" portid="22"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="ssh" product="OpenSSH" version="6.2" extrainfo="protocol 2.0" method="probed" conf="10"><cpe>cpe:/a:openbsd:openssh:6.2</cpe></service></port>
+<port protocol="tcp" portid="8080"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="XBMC Web Media Manager" ostype="Linux" devicetype="media device" method="probed" conf="10"><cpe>cpe:/o:linux:linux_kernel</cpe></service></port>
+</ports>
+<times srtt="340" rttvar="22" to="100000"/>
+</host>
+<host starttime="1439578443" endtime="1439578460"><status state="up" reason="reset" reason_ttl="255"/>
+<address addr="192.168.0.5" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="100">
+<extrareasons reason="net-unreaches" count="100"/>
+</extraports>
+</ports>
+<times srtt="1116" rttvar="653" to="100000"/>
+</host>
+<host starttime="1439578443" endtime="1439578460"><status state="up" reason="reset" reason_ttl="255"/>
+<address addr="192.168.0.6" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="100">
+<extrareasons reason="net-unreaches" count="100"/>
+</extraports>
+</ports>
+<times srtt="1410" rttvar="1164" to="100000"/>
+</host>
+<host starttime="1439578443" endtime="1439578460"><status state="up" reason="reset" reason_ttl="255"/>
+<address addr="192.168.0.7" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+<ports><extraports state="filtered" count="100">
+<extrareasons reason="net-unreaches" count="97"/>
+<extrareasons reason="no-responses" count="3"/>
+</extraports>
+</ports>
+<times srtt="4050" rttvar="1710" to="100000"/>
+</host>
+<runstats><finished time="1439578601" timestr="Fri Aug 14 18:56:41 2015" elapsed="158.18" summary="Nmap done at Fri Aug 14 18:56:41 2015; 8 IP addresses (8 hosts up) scanned in 158.18 seconds" exit="success"/><hosts up="8" down="0" total="8"/>
+</runstats>
+</nmaprun>
