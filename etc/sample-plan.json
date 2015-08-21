@@ -1,0 +1,35 @@
+{
+  "configuration": {
+    "baseline": {},
+    "configuration": {
+      "default_severity": "medium",
+      "raise_unrecognized_software": false,
+      "raise_unrecognized_software_severity": "high",
+      "version_severity_override": false
+    },
+    "scan": {
+      "types": ["tcp_connect", "version"],
+      "ports": {
+        "TCP": ["20-22", "25", "53", "80", "113", "143", "443", "465", "587", "993", "995", "3306", "5462", "6665-6667", "6697", "8080"],
+        "UDP": ["53"],
+        "top_ports": 250
+      }
+    },
+    "severity": {
+      "ports": {
+        "info": ["22", "80", "443"],
+        "low": ["53"],
+        "medium": ["113", "143", "465", "587", "993", "993", "6665-6667", "6697", "8080"],
+        "high": ["20-21", "23"],
+        "critical": ["3306", "5432"]
+      },
+      "version": {
+        "info": ["Apache httpd", "nginx", "OpenSSH"],
+        "high": ["Apache httpd 1", "Apache httpd 2.0"],
+        "critical": ["MySQL", "PostgreSQL"]
+      }
+    }
+  },
+  "description": "Run the NMAP scanner.",
+  "plugin_name": "minion.plugins.nmap.NMAPPlugin"
+}

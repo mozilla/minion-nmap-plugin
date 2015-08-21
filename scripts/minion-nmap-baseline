@@ -1,0 +1,37 @@
+#!/usr/bin/env python
+
+from collections import OrderedDict
+import json
+import minion.plugins.nmap
+import socket
+import sys
+
+if len(sys.argv) != 2:
+    print """Generate a JSON object that can be used as the baseline parameter in the nmap module
+
+Usage: {0} <nmap-xml-output.xml>""".format(sys.argv[0])
+    sys.exit(1)
+
+
+if __name__ == '__main__':
+    nmap = minion.plugins.nmap.NMAPPlugin()
+
+    try:
+        with open(sys.argv[1]) as xmlfp:
+           parsed = nmap.parse_nmap_xml(xmlfp.read())
+    except IOError, e:
+        print e
+        sys.exit(1)
+
+    # Sort the output by hostname / IP to make a nicer looking baseline
+    try:
+        hosts = sorted(parsed.keys(), key=lambda host: socket.inet_aton(host))
+    except socket.error:
+        hosts = sorted(parsed.keys())
+
+    output = OrderedDict()
+    for host in hosts:
+        # JSON doesn't allow you to have periods in hostnames
+        output[ host.replace('.', '_') ] = parsed[host]
+
+    print json.dumps(output, indent=2)

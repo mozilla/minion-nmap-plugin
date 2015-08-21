@@ -1,0 +1,57 @@
+{
+  "192_168_0_0": {
+    "ip": "192.168.0.0",
+    "hostnames": [],
+    "ports": {}
+  },
+  "192_168_0_1": {
+    "ip": "192.168.0.1",
+    "hostnames": [],
+    "ports": {
+      "548": {
+        "state": "open",
+        "protocol": "tcp",
+        "product": null,
+        "name": "afp"
+      },
+      "22": {
+        "state": "open",
+        "protocol": "tcp",
+        "product": "OpenSSH 3.14.15",
+        "name": "ssh"
+      }
+    }
+  },
+  "192_168_0_3": {
+    "ip": "192.168.0.3",
+    "hostnames": [],
+    "ports": {}
+  },
+  "192_168_0_4": {
+    "ip": "192.168.0.4",
+    "hostnames": [],
+    "ports": {
+      "22": {
+        "state": "open",
+        "protocol": "tcp",
+        "product": "OpenSSH 6.2",
+        "name": "ssh"
+      }
+    }
+  },
+  "192_168_0_5": {
+    "ip": "192.168.0.5",
+    "hostnames": [],
+    "ports": {}
+  },
+  "192_168_0_6": {
+    "ip": "192.168.0.6",
+    "hostnames": [],
+    "ports": {}
+  },
+  "192_168_0_7": {
+    "ip": "192.168.0.7",
+    "hostnames": [],
+    "ports": {}
+  }
+}
