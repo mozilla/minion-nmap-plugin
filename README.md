@@ -76,6 +76,19 @@ $ nmap -oX /tmp/nmap-output.xml --no-stylesheet --top-ports 100 -sTV 192.168.0.0
 $ minion-nmap-baseline /tmp/nmap-output.xml
 ```
 
+Each baseline file contains a JSON entry for every port found during the nmap scan.  It also includes an `__ALLHOSTS__` entry, which has two keys:
+
+```
+"__ALLHOSTS__": {
+  "ports": ["80", "443"],
+  "products": ["nginx"]
+}
+```
+
+`ports` works like `severity -> ports` in the scan section: they can be individual ports, or port ranges (8080-8089)
+`products` is the same as in `severity -> version`: each entry is a regular expression
+
+`__ALLHOSTS__` lets you whitelist ports in an entire network range, for example, if you never want to be notified about port 22.  It also lets you whitelist known safe software, for example, OpenSSH 6.2.
 
 Caveats
 -------
@@ -87,7 +100,6 @@ TODO
 ----
 
 * Add support so that clarifies if it's a version mismatch in baseline
-* Add support for "ignored" ports (via ALLHOSTS in baseline)
 * Add support to not raise issues for informational ports
 * Add support for CIDR (network ranges) in the baseline
 * Add support for artifact generation, particularly a baseline to download

@@ -112,17 +112,11 @@ class NMAPPlugin(ExternalProcessPlugin):
             self.SEVERITY_TO_PORTS[level] = set()
             ports = self.configuration.get('severity', {}).get('ports', {}).get(level, [])
             for port in ports:
-                port_range = self._generate_port_range(port)
-
-                # A range like 6666-6669, or a single port
-                if len(port_range) > 1:
-                    self.SEVERITY_TO_PORTS[level].update(range(port_range[0], port_range[1] + 1))
-                else:
-                    self.SEVERITY_TO_PORTS[level].update([port_range[0]])
+                self.SEVERITY_TO_PORTS[level].update( self._generate_port_range(port) )
 
 
     def _create_version_to_severity_mappings(self):
-        """Generate the internal struction SEVERITY_TO_VERSION, which contains all the levels of severity, along with
+        """Generate the internal structure SEVERITY_TO_VERSION, which contains all the levels of severity, along with
         which regular expressions are bound to that severity"""
 
         self.SEVERITY_TO_VERSION = {}
@@ -141,15 +135,23 @@ class NMAPPlugin(ExternalProcessPlugin):
             port: a string containing a port or port range
 
         Returns:
-            an array containing either a single port or the bottom and top port of that range; for example either
-            '21' -> [21, 21] or '6666-6668' -> [6666, 6668]"""
+            an array containing all the port numbers found in that range
+            '21' -> [21] or '6666-6668' -> [6666, 6667, 6668]
 
-        # Make sure that every port is an integer, and within the proper range of 1-65535
+        Raises:
+           Exception: When the ports are invalid -- either non-integers, < 1, or > 65535
+        """
+
+        # Cast it to a string first, in case somebody accidentally puts it in their plan as an integer
+        port = str(port)
+
         try:
+            # Make sure that every port is an integer, and within the proper range of 1-65535
             port = [int(x) for x in port.split('-')]
             if port[0] < 1 or port[-1] > 65535:
                 raise ValueError
-            return port
+
+            return range(port[0], port[-1] + 1)
         except:
             raise Exception('Invalid port or port range in configuration: "{0}"'.format(port))
 
@@ -376,8 +378,7 @@ class NMAPPlugin(ExternalProcessPlugin):
         return issues
 
 
-    @staticmethod
-    def parse_nmap_xml(xml, baseline={}):
+    def parse_nmap_xml(self, xml, baseline={}):
         """Parses the output of nmap -oX --no-stylesheet and returns a Python dictionary containing information on
         each host that was scanned.
 
@@ -469,24 +470,39 @@ class NMAPPlugin(ExternalProcessPlugin):
 
         # If a baseline has been passed in, we need to prune the output of all those entries
         if baseline:
+            # Let's remove the __ALLHOSTS__ entry from the baseline, turn into things we can use
+            allhosts = baseline.pop('__ALLHOSTS__', {'ports': [], 'products': []})
+            allhosts_ports = set()
+            for port in allhosts['ports']:
+                allhosts_ports.update(self._generate_port_range(port))
+            allhosts_products = [re.compile('^' + x, re.IGNORECASE) for x in allhosts['products']]
+
             # "Deserialize" the baseline, where you can't use periods in key entries (hostnames)
             for baseline_host in baseline.iterkeys():
                 baseline[ baseline_host.replace('_', '.') ] = baseline.pop(baseline_host)
 
-            for baseline_host in baseline:
-                for baseline_port_num, baseline_port in baseline[baseline_host].get('ports', {}).iteritems():
-                    baseline_state = baseline_port.get('state', None)
-                    baseline_product = str(baseline_port.get('product', ''))
 
-                    parsed_port = hosts.get(baseline_host, {}).get('ports', {}).get(baseline_port_num, {})
-                    parsed_state = parsed_port.get('state', None)
-                    parsed_product = str(parsed_port.get('product', ''))
-
-                    if baseline_state == None:
+            for host in hosts.iterkeys():
+                for port in hosts[host]['ports'].keys():
+                    # If a port or product is in the __ALLHOSTS__ entry, it shouldn't show up in the results
+                    if (int(port) in allhosts_ports or
+                        [True for x in allhosts_products if x.search(str(hosts[host]['ports'][port]['product']))]):
+                        del(hosts[host]['ports'][port])
                         continue
 
-                    if baseline_state == parsed_state and re.search('^' + baseline_product, parsed_product, re.IGNORECASE):
-                        del(hosts[baseline_host]['ports'][baseline_port_num])
+                    # If a host -> port -> state and host -> port -> product match their mirror in the baseline, remove them
+                    # from the output
+                    if ((hosts[host]['ports'][port]['state'] ==
+                             baseline.get(host, {})
+                                     .get('ports', {})
+                                     .get(port, {})
+                                     .get('state', None)) and
+                            (re.search('^' + str(
+                            baseline.get(host, {})
+                                    .get('ports', {})
+                                    .get(port, {})
+                                    .get('product', '')), str(hosts[host]['ports'][port]['product']), re.IGNORECASE))):
+                        del(hosts[host]['ports'][port])
 
         return hosts
 
