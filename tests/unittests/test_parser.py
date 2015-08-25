@@ -49,7 +49,21 @@ class TestParser(unittest.TestCase):
                                                'state': 'open'}}},
             '192.168.0.5': {'hostnames': [], 'ip': '192.168.0.5', 'ports': {}},
             '192.168.0.6': {'hostnames': [], 'ip': '192.168.0.6', 'ports': {}},
-            '192.168.0.7': {'hostnames': [], 'ip': '192.168.0.7', 'ports': {}}}
+            '192.168.0.7': {'hostnames': [], 'ip': '192.168.0.7', 'ports': {}},
+            '192.168.0.8': {'hostnames': [],
+                            'ip': '192.168.0.8',
+                            'ports': {'443': {'name': 'http',
+                                              'product': 'Apache httpd 2.4.16',
+                                              'protocol': 'tcp',
+                                              'state': 'open'},
+                                      '80': {'name': 'http',
+                                             'product': 'Apache httpd 2.4.16',
+                                             'protocol': 'tcp',
+                                             'state': 'open'},
+                                      '8080': {'name': 'http',
+                                               'product': 'nginx 1.9.4',
+                                               'protocol': 'tcp',
+                                               'state': 'open'}}}}
 
         self.assertEquals(expected_result, self.nmap.parse_nmap_xml(self.nmap.stdout))
 
@@ -92,7 +106,8 @@ class TestParser(unittest.TestCase):
                                                'state': 'open'}}},
             '192.168.0.5': {'hostnames': [], 'ip': '192.168.0.5', 'ports': {}},
             '192.168.0.6': {'hostnames': [], 'ip': '192.168.0.6', 'ports': {}},
-            '192.168.0.7': {'hostnames': [], 'ip': '192.168.0.7', 'ports': {}}}
+            '192.168.0.7': {'hostnames': [], 'ip': '192.168.0.7', 'ports': {}},
+            '192.168.0.8': {'hostnames': [], 'ip': '192.168.0.8', 'ports': {}}}  # ALLHOSTS should remove all entries
 
         self.assertEquals(expected_result, self.nmap.parse_nmap_xml(self.nmap.stdout, baseline))
 

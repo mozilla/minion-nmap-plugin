@@ -29,7 +29,12 @@ if __name__ == '__main__':
     except socket.error:
         hosts = sorted(parsed.keys())
 
+    # Create the ordered dict, so output is in the same order as we add the keys
     output = OrderedDict()
+
+    # First, add the __ALLHOSTS__ entry
+    output[ '__ALLHOSTS__' ] = { 'ports': [], 'products': [] }
+
     for host in hosts:
         # JSON doesn't allow you to have periods in hostnames
         output[ host.replace('.', '_') ] = parsed[host]
