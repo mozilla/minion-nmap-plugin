@@ -12,6 +12,8 @@ You can install the plugin by running the following command in the minion-nmap-p
 
 ```python setup.py install```
 
+If running minion inside of vitualenv, make sure to activate it first.
+
 Example of plan
 ---------------
 ```
@@ -58,13 +60,13 @@ Most of the options are not mandatory and some have default values.
 * `baseline`: a JSON blob that tells the nmap plugin which services and ports that it already knows about, so as to not generate alerts
 * `configuration`
   * `default_severity`: the severity of issue to raise if the plugin recognizes neither the port nor the version detected
-  * `raise_unrecognized_software`: when set to true, any software that doesn't match an item in `severity` -> `version` will raise an issue with the severity of `raise_unrecognized_software_severity`. Ideally set to true, but set to false by default so as to not raise a lot of erroneously high issues on initial scans. Note that if this is not set, then any software that doesn't match a pattern in `severity` -> `version` will simply return the severity associated with that port, or `configuration` -> `default_severity` if it matches neither port nor version.
+  * `raise_unrecognized_software`: when set to true, any software that doesn't match an item in `severity -> version` will raise an issue with the severity of `raise_unrecognized_software_severity`. Ideally set to true, but set to false by default so as to not raise a lot of erroneously high issues on initial scans. Note that if this is not set, then any software that doesn't match a pattern in `severity -> version` will simply return the severity associated with that port, or `configuration -> default_severity` if it matches neither port nor version.
   * `raise_unrecognized_software_severity`: the severity of issue the plugin will raise when it detects software that isn't recognized
   * `version_severity_override`: on a typical issue, the plugin will return the highest severity associated with either the port or the value. In certain circumstances, people may want to run a known safe product on an unsafe port; setting this will cause the plugin to return the severity associated with that version of software, even if the port may normally generate a higher severity issue
 * `scan`
   * `types`: options are `tcp_connect` (-sT), `udp` (-sU), `syn` (-sS), `null` (-sN), `fin` (-sF), `christmas` (-sX), and `version` (-sV)
   * `ports`: a list of TCP and UDP ports to tell nmap to scan, unless overridden by `scan` -> `top_ports`
-  * `top_ports`: instructs nmap to scan the top X most commonly known ports; if set to 0 (or removed), nmap will instead scan the ports listed in `scan` -> `ports` -> `TCP`/`UDP`
+  * `top_ports`: instructs nmap to scan the top X most commonly known ports; if set to 0 (or removed), nmap will instead scan the ports listed in `scan -> ports -> TCP/UDP`
 * `severity`
   * `ports`: the severity of issue to raise, if nmap detects an open port; supports ranges of numbers such as 6665-6667
   * `version`: when doing a version scan, the severity of issue to raise if nmap detects a version of software matching a version listed: each entry is a regular expression, allowing complex subversion detection
@@ -88,7 +90,7 @@ Each baseline file contains a JSON entry for every port found during the nmap sc
 ```
 
 `ports` works like `severity -> ports` in the scan section: they can be individual ports, or port ranges (8080-8089)
-`products` is the same as in `severity -> version`: each entry is a regular expression
+`products` functions the same as in `severity -> version`: each entry is a regular expression, detailing a piece of software known to be safe in the network
 
 `__ALLHOSTS__` lets you whitelist ports in an entire network range, for example, if you never want to be notified about port 22.  It also lets you whitelist known safe software, for example, OpenSSH 6.2.
 
@@ -101,8 +103,6 @@ Also note that only tcp_connect and version scans will work with typical Minion 
 TODO
 ----
 
-* Add support so that clarifies if it's a version mismatch in baseline
-* Add support to not raise issues for informational ports
 * Add support for CIDR (network ranges) in the baseline
 * Add support for artifact generation, particularly a baseline to download
 * Better UDP support
