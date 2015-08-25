@@ -3,6 +3,8 @@ Minion Nmap Plugin
 
 This is a plugin for Minion that executes the Nmap tool. It assumes `nmap` is installed on your system and that it is on the system PATH. If you use Ubuntu, Debian, Redhat or Fedora you can simply install the `nmap` package through `yum` or `apt-get`.
 
+![Preview Image](http://i.imgur.com/n6ngwpk.png)
+
 Installation
 ------------
 
