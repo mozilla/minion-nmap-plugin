@@ -53,8 +53,8 @@ Example of plan
   "plugin_name": "minion.plugins.nmap.NMAPPlugin"
 }
 ```
-Available configuration option
-------------------------------
+Available configuration options
+-------------------------------
 Most of the options are not mandatory and some have default values.
 
 * `baseline`: a JSON blob that tells the nmap plugin which services and ports that it already knows about, so as to not generate alerts
